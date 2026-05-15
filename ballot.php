@@ -175,10 +175,10 @@ if(!isset($_SESSION['voter_id'])) {
                      class="candidate-photo" alt="Candidate">
                 <div class="flex-grow-1">
                     <div class="candidate-name">
-                        Adama Barrow
+                        Julius Maada Bio
                     </div>
                     <div class="candidate-party">
-                        🟢 National People's Party (NPP)
+                        🟢Sierra Leone People's Party (SLPP)
                     </div>
                 </div>
                 <div class="select-indicator">✓</div>
@@ -193,10 +193,10 @@ if(!isset($_SESSION['voter_id'])) {
                      class="candidate-photo" alt="Candidate">
                 <div class="flex-grow-1">
                     <div class="candidate-name">
-                        Ousainou Darboe
+                       Kandeh Kolleh Yumkella
                     </div>
                     <div class="candidate-party">
-                        🔵 United Democratic Party (UDP)
+                        🔵National Grand Coalition (NGC)
                     </div>
                 </div>
                 <div class="select-indicator">✓</div>
@@ -211,10 +211,10 @@ if(!isset($_SESSION['voter_id'])) {
                      class="candidate-photo" alt="Candidate">
                 <div class="flex-grow-1">
                     <div class="candidate-name">
-                        Mama Kandeh
+                        Charles Francis Margai
                     </div>
                     <div class="candidate-party">
-                        🟡 Gambia Democratic Congress (GDC)
+                        🟡 People's Movement for Democratic Change (PMDC)
                     </div>
                 </div>
                 <div class="select-indicator">✓</div>
@@ -229,10 +229,10 @@ if(!isset($_SESSION['voter_id'])) {
                      class="candidate-photo" alt="Candidate">
                 <div class="flex-grow-1">
                     <div class="candidate-name">
-                        Halifa Sallah
+                        Samura Mathew Wilson Kamara
                     </div>
                     <div class="candidate-party">
-                        🔴 People's Democratic Organisation (PDOIS)
+                        🔴 All People's Congress (APC)
                     </div>
                 </div>
                 <div class="select-indicator">✓</div>
