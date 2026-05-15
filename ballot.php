@@ -4,12 +4,53 @@ if(!isset($_SESSION['voter_id'])) {
     header('Location: login.php');
     exit();
 }
+require_once 'config/database.php';
+$conn = connectDB();
+
+// Check if voter already voted
+$voter_id = $_SESSION['voter_id'];
+$check = $conn->query(
+    "SELECT has_voted FROM voters 
+     WHERE id='$voter_id'"
+);
+$voter = $check->fetch_assoc();
+if($voter['has_voted'] == 1) {
+    header('Location: confirmation.php');
+    exit();
+}
+
+// Check election is active
+$election_result = $conn->query(
+    "SELECT * FROM elections 
+     WHERE status='active' LIMIT 1"
+);
+if($election_result->num_rows === 0) {
+    $_SESSION['error'] = 
+        'Voting is currently closed. 
+         Please check back later.';
+    header('Location: index.php');
+    exit();
+}
+$election = $election_result->fetch_assoc();
+
+// Load candidates from database
+$candidates_result = $conn->query(
+    "SELECT * FROM candidates 
+     ORDER BY full_name ASC"
+);
+$candidates = [];
+while($row = $candidates_result->fetch_assoc()) {
+    $candidates[] = $row;
+}
+$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" 
+          content="width=device-width, 
+                   initial-scale=1.0">
     <title>Cast Your Vote</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -58,6 +99,11 @@ if(!isset($_SESSION['voter_id'])) {
             opacity: 0.7;
             color: #28a745;
         }
+        .candidate-bio {
+            font-size: 12px;
+            opacity: 0.5;
+            margin-top: 5px;
+        }
         .select-indicator {
             width: 30px;
             height: 30px;
@@ -67,6 +113,7 @@ if(!isset($_SESSION['voter_id'])) {
             align-items: center;
             justify-content: center;
             font-size: 16px;
+            flex-shrink: 0;
         }
         .selected .select-indicator {
             background: #28a745;
@@ -83,8 +130,8 @@ if(!isset($_SESSION['voter_id'])) {
             margin-top: 20px;
             display: none;
         }
-        .btn-cast:hover { background-color: #218838; }
         .btn-cast.show { display: block; }
+        .btn-cast:hover { background-color: #218838; }
         .election-badge {
             background: rgba(40,167,69,0.2);
             border: 1px solid rgba(40,167,69,0.4);
@@ -103,8 +150,15 @@ if(!isset($_SESSION['voter_id'])) {
             margin-bottom: 20px;
             font-size: 13px;
             color: #ffc107;
+            text-align: center;
         }
-        /* Confirmation Modal */
+        .no-candidates {
+            background: rgba(255,255,255,0.08);
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            opacity: 0.6;
+        }
         .modal-content {
             background: #0d1b4b;
             border: 1px solid rgba(255,255,255,0.2);
@@ -139,8 +193,14 @@ if(!isset($_SESSION['voter_id'])) {
     <div class="ballot-header">
         <img src="https://cdn-icons-png.flaticon.com/512/3097/3097144.png"
              width="50" alt="Vote"><br><br>
-        <span class="election-badge">🗳️ LIVE ELECTION</span>
-        <h3 class="fw-bold mt-2">Presidential Election 2025</h3>
+        <span class="election-badge">
+            🗳️ LIVE ELECTION
+        </span>
+        <h3 class="fw-bold mt-2">
+            <?php echo htmlspecialchars(
+                $election['title']
+            ); ?>
+        </h3>
         <p style="opacity:0.7">
             Select ONE candidate and cast your vote
         </p>
@@ -159,99 +219,86 @@ if(!isset($_SESSION['voter_id'])) {
     </div>
     <?php endif; ?>
 
-    <div class="warning-box text-center">
-        ⚠️ You can only vote ONCE. 
+    <div class="warning-box">
+        ⚠️ You can only vote ONCE.
         Please choose carefully before confirming.
     </div>
 
-    <form id="ballotForm" 
-          action="process_vote.php" method="POST">
+    <?php if(count($candidates) === 0): ?>
+    <div class="no-candidates">
+        <h4>No candidates available yet</h4>
+        <p>Please check back later when 
+           candidates have been added.</p>
+    </div>
+    <?php else: ?>
 
-        <!-- Candidate 1 -->
-        <div class="candidate-card" 
-             onclick="selectCandidate(this, 1)">
-            <div class="d-flex align-items-center gap-3">
-                <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
-                     class="candidate-photo" alt="Candidate">
-                <div class="flex-grow-1">
-                    <div class="candidate-name">
-                        Julius Maada Bio
-                    </div>
-                    <div class="candidate-party">
-                        🟢Sierra Leone People's Party (SLPP)
-                    </div>
-                </div>
-                <div class="select-indicator">✓</div>
-            </div>
-        </div>
+    <form id="ballotForm"
+          action="api/process_vote.php"
+          method="POST">
 
-        <!-- Candidate 2 -->
+        <?php foreach($candidates as $index => $c): ?>
         <div class="candidate-card"
-             onclick="selectCandidate(this, 2)">
+             onclick="selectCandidate(
+                 this, 
+                 '<?php echo $c['id']; ?>',
+                 '<?php echo htmlspecialchars(
+                     $c['full_name']
+                 ); ?>',
+                 '<?php echo htmlspecialchars(
+                     $c['party']
+                 ); ?>'
+             )">
             <div class="d-flex align-items-center gap-3">
-                <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
-                     class="candidate-photo" alt="Candidate">
+                <img src="<?php echo $c['photo_url'] 
+                    ? htmlspecialchars($c['photo_url'])
+                    : 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'; ?>"
+                     class="candidate-photo"
+                     alt="<?php echo htmlspecialchars(
+                         $c['full_name']
+                     ); ?>">
                 <div class="flex-grow-1">
                     <div class="candidate-name">
-                       Kandeh Kolleh Yumkella
+                        <?php echo htmlspecialchars(
+                            $c['full_name']
+                        ); ?>
                     </div>
                     <div class="candidate-party">
-                        🔵National Grand Coalition (NGC)
+                        🏳️ <?php echo htmlspecialchars(
+                            $c['party']
+                        ); ?>
                     </div>
+                    <?php if($c['bio']): ?>
+                    <div class="candidate-bio">
+                        <?php echo htmlspecialchars(
+                            $c['bio']
+                        ); ?>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <div class="select-indicator">✓</div>
             </div>
         </div>
+        <?php endforeach; ?>
 
-        <!-- Candidate 3 -->
-        <div class="candidate-card"
-             onclick="selectCandidate(this, 3)">
-            <div class="d-flex align-items-center gap-3">
-                <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
-                     class="candidate-photo" alt="Candidate">
-                <div class="flex-grow-1">
-                    <div class="candidate-name">
-                        Charles Francis Margai
-                    </div>
-                    <div class="candidate-party">
-                        🟡 People's Movement for Democratic Change (PMDC)
-                    </div>
-                </div>
-                <div class="select-indicator">✓</div>
-            </div>
-        </div>
+        <input type="hidden"
+               name="candidate_id"
+               id="selectedCandidate"
+               value="">
 
-        <!-- Candidate 4 -->
-        <div class="candidate-card"
-             onclick="selectCandidate(this, 4)">
-            <div class="d-flex align-items-center gap-3">
-                <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
-                     class="candidate-photo" alt="Candidate">
-                <div class="flex-grow-1">
-                    <div class="candidate-name">
-                        Samura Mathew Wilson Kamara
-                    </div>
-                    <div class="candidate-party">
-                        🔴 All People's Congress (APC)
-                    </div>
-                </div>
-                <div class="select-indicator">✓</div>
-            </div>
-        </div>
-
-        <input type="hidden" name="candidate_id" 
-               id="selectedCandidate" value="">
-
-        <button type="button" class="btn-cast" 
+        <button type="button"
+                class="btn-cast"
                 id="castBtn"
                 onclick="showConfirmModal()">
             🗳️ Cast My Vote
         </button>
     </form>
+
+    <?php endif; ?>
+
 </div>
 
 <!-- Confirmation Modal -->
-<div class="modal fade" id="confirmModal" 
+<div class="modal fade" id="confirmModal"
      tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content p-2">
@@ -264,18 +311,19 @@ if(!isset($_SESSION['voter_id'])) {
                 <p style="font-size:16px;">
                     You are about to vote for:
                 </p>
-                <h4 class="fw-bold text-success" 
+                <h4 class="fw-bold text-success"
                     id="confirmName"></h4>
                 <p style="opacity:0.7; font-size:14px;"
                    id="confirmParty"></p>
                 <hr style="border-color:rgba(255,255,255,0.2)">
                 <p style="color:#ffc107; font-size:13px;">
-                    ⚠️ This action CANNOT be undone. 
+                    ⚠️ This action CANNOT be undone.
                     You can only vote once.
                 </p>
             </div>
-            <div class="modal-footer justify-content-center gap-3">
-                <button class="btn-cancel" 
+            <div class="modal-footer 
+                        justify-content-center gap-3">
+                <button class="btn-cancel"
                         data-bs-dismiss="modal">
                     Cancel
                 </button>
@@ -293,34 +341,29 @@ let selectedId = '';
 let selectedName = '';
 let selectedParty = '';
 
-const candidates = {
-    1: { name: 'Adama Barrow', 
-         party: 'National Peoples Party (NPP)' },
-    2: { name: 'Ousainou Darboe', 
-         party: 'United Democratic Party (UDP)' },
-    3: { name: 'Mama Kandeh', 
-         party: 'Gambia Democratic Congress (GDC)' },
-    4: { name: 'Halifa Sallah', 
-         party: 'Peoples Democratic Organisation (PDOIS)' }
-};
-
-function selectCandidate(card, id) {
+function selectCandidate(card, id, name, party) {
     document.querySelectorAll('.candidate-card')
         .forEach(c => c.classList.remove('selected'));
     card.classList.add('selected');
     selectedId = id;
-    selectedName = candidates[id].name;
-    selectedParty = candidates[id].party;
-    document.getElementById('selectedCandidate').value = id;
-    document.getElementById('castBtn').classList.add('show');
+    selectedName = name;
+    selectedParty = party;
+    document.getElementById(
+        'selectedCandidate'
+    ).value = id;
+    document.getElementById(
+        'castBtn'
+    ).classList.add('show');
 }
 
 function showConfirmModal() {
     if(!selectedId) return;
-    document.getElementById('confirmName').textContent = 
-        selectedName;
-    document.getElementById('confirmParty').textContent = 
-        selectedParty;
+    document.getElementById(
+        'confirmName'
+    ).textContent = selectedName;
+    document.getElementById(
+        'confirmParty'
+    ).textContent = selectedParty;
     new bootstrap.Modal(
         document.getElementById('confirmModal')
     ).show();
